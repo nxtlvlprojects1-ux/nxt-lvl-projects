@@ -880,6 +880,10 @@ footer{background:var(--deep);color:var(--on-deep-muted);border-top:1px solid va
           <div class="chat-log" id="chatLog" role="log" aria-live="polite" aria-label="Conversation"></div>
           <div class="chat-input" id="chatInput"></div>
         </div>
+        <form name="contact" method="POST" data-netlify="true" netlify-honeypot="bot-field" id="netlifyForm" hidden>
+          <input type="hidden" name="form-name" value="contact">
+          <input name="bot-field" aria-label="Leave empty"><input name="name" aria-label="Name"><input name="business" aria-label="Business"><input name="business-type" aria-label="Business type"><input name="needs" aria-label="Needs"><input name="contact-method" aria-label="Contact method"><input name="phone" aria-label="Phone"><input name="email" aria-label="Email"><textarea name="message" aria-label="Message"></textarea><textarea name="attached" aria-label="Attached"></textarea>
+        </form>
       </div>
     </div>
   </div>
@@ -1159,13 +1163,24 @@ footer{background:var(--deep);color:var(--on-deep-muted);border-top:1px solid va
       go.addEventListener('click',function(){go.disabled=true;submit();});
     });
   }
-  function submit(){
+  function sendNetlify(){
+    var F=$('netlifyForm').elements;
+    F['name'].value=C.name;F['business'].value=C.business;F['business-type'].value=C.type;F['needs'].value=C.needs;F['contact-method'].value=C.method;
+    F['phone'].value=C.phone;F['email'].value=C.email;F['message'].value=C.message;F['attached'].value=attachments.join('\n');
+    var data=new URLSearchParams(new FormData($('netlifyForm'))).toString();
+    return fetch('/',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:data}).then(function(r){if(!r.ok)throw new Error('netlify');});
+  }
+  function sendFormSubmit(){
     var payload={_subject:'New website enquiry: '+(C.business||C.name),_template:'table',_captcha:'false',
       Name:C.name,Business:C.business||'Not set up yet','Business type':C.type,Needs:C.needs,'Contact by':C.method,
       Phone:C.phone||'-',Email:C.email||'-',Notes:C.message||'-',Attached:attachments.join(' | ')||'-'};
     if(C.email)payload._replyto=C.email;
-    fetch(INBOX,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload)})
-      .then(function(r){return r.json().then(function(d){if(!r.ok||String(d.success)==='false')throw new Error();});})
+    return fetch(INBOX,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload)})
+      .then(function(r){return r.json().then(function(d){if(!r.ok||String(d.success)==='false')throw new Error('formsubmit');});});
+  }
+  function submit(){
+    /* Netlify Forms first (works when hosted on Netlify), FormSubmit as a backup on any other host */
+    sendNetlify().catch(sendFormSubmit)
       .then(function(){clearInput();bot('Sent! Thanks '+esc(C.name.split(' ')[0])+'. I\'ll be in touch '+(C.method==='Phone'?'by phone':'by email')+' soon about your free draft.');attachments=[];})
       .catch(function(){clearInput();bot('Sorry, your message couldn\'t be sent from this page. Please ring me on <strong>087 461 9270</strong> or email <strong>nxtlvlprojects1@gmail.com</strong>.',function(){
         var again=el('button','btn btn-line','Try again');again.type='button';again.addEventListener('click',review);inp.appendChild(again);});});
